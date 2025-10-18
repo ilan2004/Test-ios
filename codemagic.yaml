@@ -1,7 +1,7 @@
 workflows:
-  # Simple test build without code signing
+  # Test build with automatic signing (creates IPA)
   ios-test-build:
-    name: iOS Test Build (No Signing)
+    name: iOS Test Build (Auto Signing)
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
@@ -10,25 +10,42 @@ workflows:
         XCODE_SCHEME: "SimpleRoutingApp"
       xcode: latest
     scripts:
-      - name: Build Swift project for testing
+      - name: Build IPA with automatic signing
         script: |
           set -e
-          echo "Building iOS app for testing..."
+          echo "Building iOS app with automatic signing..."
           
-          # Build the project without code signing
-          xcodebuild \
-            -project "$XCODE_PROJECT" \
-            -scheme "$XCODE_SCHEME" \
-            -destination "generic/platform=iOS Simulator" \
-            -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            build
+          # Use Codemagic's built-in IPA creation (with automatic signing)
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-flags="-destination 'generic/platform=iOS'" \
+            --export-options-plist export-options.plist
             
-          echo "Build completed successfully!"
+          echo "IPA created successfully!"
+      - name: Create export options plist
+        script: |
+          cat > export-options.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>stripSwiftSymbols</key>
+              <false/>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
     artifacts:
+      - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
     publishing:
       email:
         recipients:
