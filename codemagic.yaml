@@ -10,21 +10,12 @@ workflows:
         XCODE_SCHEME: "SimpleRoutingApp"
       xcode: latest
     scripts:
-      - name: Build IPA with automatic signing
+      - name: Create export options and build IPA
         script: |
           set -e
           echo "Building iOS app with automatic signing..."
           
-          # Use Codemagic's built-in IPA creation (with automatic signing)
-          xcode-project build-ipa \
-            --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-flags="-destination 'generic/platform=iOS'" \
-            --export-options-plist export-options.plist
-            
-          echo "IPA created successfully!"
-      - name: Create export options plist
-        script: |
+          # Create export options plist first
           cat > export-options.plist << 'EOF'
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -43,6 +34,14 @@ workflows:
           </dict>
           </plist>
           EOF
+          
+          # Build IPA with Codemagic's tool
+          xcode-project build-ipa \
+            --project "$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --export-options-plist export-options.plist
+            
+          echo "IPA created successfully!"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
