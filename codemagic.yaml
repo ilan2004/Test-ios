@@ -1,20 +1,58 @@
 workflows:
-  ios-workflow:
-    name: iOS Workflow
+  # Simple test build without code signing
+  ios-test-build:
+    name: iOS Test Build (No Signing)
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      vars:
+        XCODE_PROJECT: "SimpleRoutingApp.xcodeproj"
+        XCODE_SCHEME: "SimpleRoutingApp"
+      xcode: latest
+    scripts:
+      - name: Build Swift project for testing
+        script: |
+          set -e
+          echo "Building iOS app for testing..."
+          
+          # Build the project without code signing
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -destination "generic/platform=iOS Simulator" \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+            
+          echo "Build completed successfully!"
+    artifacts:
+      - /tmp/xcodebuild_logs/*.log
+      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
+    publishing:
+      email:
+        recipients:
+          - your-email@example.com
+        notify:
+          success: true
+          failure: true
+
+  # Full production build with signing (requires Apple Developer account)
+  ios-production:
+    name: iOS Production Build
     instance_type: mac_mini_m1
     max_build_duration: 120
     environment:
       ios_signing:
         distribution_type: app_store
-        bundle_identifier: com.example.SimpleRoutingApp
+        bundle_identifier: com.yourcompany.SimpleRoutingApp  # Change this!
       vars:
-        XCODE_WORKSPACE: "SimpleRoutingApp.xcodeproj"
+        XCODE_PROJECT: "SimpleRoutingApp.xcodeproj"
         XCODE_SCHEME: "SimpleRoutingApp"
-        BUNDLE_ID: "com.example.SimpleRoutingApp"
+        BUNDLE_ID: "com.yourcompany.SimpleRoutingApp"  # Change this!
       xcode: latest
-      cocoapods: default
     scripts:
-      - name: Set up keychain to be used for code signing using Codemagic CLI 'keychain' command
+      - name: Set up keychain for code signing
         script: |
           keychain initialize
       - name: Fetch signing files
@@ -22,32 +60,21 @@ workflows:
           app-store-connect fetch-signing-files $BUNDLE_ID \
             --type IOS_APP_STORE \
             --create
-      - name: Use system default keychain
+      - name: Add certificates to keychain
         script: |
           keychain add-certificates
-      - name: Set up code signing settings on Xcode project
+      - name: Configure code signing
         script: |
           xcode-project use-profiles
-      - name: Get CocoaPods dependencies
-        script: |
-          # pod install # Uncomment if using CocoaPods
-      - name: Build ipa for distribution
+      - name: Build IPA for App Store
         script: |
           xcode-project build-ipa \
-            --workspace "$XCODE_WORKSPACE" \
+            --project "$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.app
-      - $HOME/Library/Developer/Xcode/DerivedData/**/Build/**/*.dSYM
     publishing:
-      email:
-        recipients:
-          - user@example.com
-        notify:
-          success: true
-          failure: false
       app_store_connect:
         api_key: $APP_STORE_CONNECT_PRIVATE_KEY
         key_id: $APP_STORE_CONNECT_KEY_IDENTIFIER

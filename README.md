@@ -41,13 +41,19 @@ SimpleRoutingApp/
 4. Replace default files with these Swift files
 5. Build and run on simulator or device
 
-### Option 2: GitHub Actions
-1. Push to GitHub repository
-2. GitHub Actions will attempt to build (requires iOS certificates for full IPA)
-3. Download build artifacts from Actions tab
+### Option 2: Codemagic (Recommended)
+1. Go to [Codemagic.io](https://codemagic.io) and sign up
+2. Connect your GitHub repository
+3. Select the **ios-test-build** workflow for testing without signing
+4. Build will create a simulator-compatible app for testing
 
-### Option 3: Cloud Build Services
-- **Codemagic**: Upload repository and build IPA
+**For production IPA (requires Apple Developer Account):**
+- Use the **ios-production** workflow
+- Add your App Store Connect API keys in Codemagic settings
+- Change bundle identifier from `com.test.SimpleRoutingApp` to your own
+
+### Option 3: Other Cloud Services
+- **GitHub Actions**: Uses the workflow in `.github/workflows/`
 - **Bitrise**: iOS CI/CD with cloud macOS runners
 - **AppCenter**: Microsoft's app build service
 
