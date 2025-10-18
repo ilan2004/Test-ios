@@ -1,47 +1,69 @@
 workflows:
-  # Test build with automatic signing (creates IPA)
-  ios-test-build:
-    name: iOS Test Build (Auto Signing)
+  # Simple build that creates an unsigned IPA
+  ios-unsigned-ipa:
+    name: iOS Unsigned IPA Build
     instance_type: mac_mini_m1
-    max_build_duration: 60
+    max_build_duration: 30
     environment:
       vars:
         XCODE_PROJECT: "SimpleRoutingApp.xcodeproj"
         XCODE_SCHEME: "SimpleRoutingApp"
       xcode: latest
     scripts:
-      - name: Create export options and build IPA
+      - name: Build unsigned app and create IPA
         script: |
           set -e
-          echo "Building iOS app with automatic signing..."
+          echo "Building unsigned iOS app..."
           
-          # Create export options plist first
-          cat > export-options.plist << 'EOF'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-              <key>method</key>
-              <string>development</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
-              <key>stripSwiftSymbols</key>
-              <false/>
-              <key>uploadBitcode</key>
-              <false/>
-              <key>uploadSymbols</key>
-              <false/>
-          </dict>
-          </plist>
-          EOF
+          # Build the app without signing
+          xcodebuild \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath "$HOME/DerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+            
+          # Find the built app
+          APP_PATH=$(find "$HOME/DerivedData/Build/Products" -name "SimpleRoutingApp.app" -type d | head -1)
+          echo "Found app at: $APP_PATH"
           
-          # Build IPA with Codemagic's tool
+          # Create Payload directory
+          mkdir -p Payload
+          cp -r "$APP_PATH" Payload/
+          
+          # Create IPA file
+          zip -r SimpleRoutingApp-unsigned.ipa Payload/
+          
+          echo "Unsigned IPA created: SimpleRoutingApp-unsigned.ipa"
+          ls -la *.ipa
+    artifacts:
+      - "*.ipa"
+      - /tmp/xcodebuild_logs/*.log
+  
+  # Signed build for real devices (requires Apple Developer account)  
+  ios-signed-ipa:
+    name: iOS Signed IPA (Requires Dev Account)
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      ios_signing:
+        distribution_type: development
+        bundle_identifier: com.test.SimpleRoutingApp
+      vars:
+        XCODE_PROJECT: "SimpleRoutingApp.xcodeproj"
+        XCODE_SCHEME: "SimpleRoutingApp"
+      xcode: latest
+    scripts:
+      - name: Set up keychain
+        script: keychain initialize
+      - name: Build signed IPA
+        script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME" \
-            --export-options-plist export-options.plist
-            
-          echo "IPA created successfully!"
+            --scheme "$XCODE_SCHEME"
     artifacts:
       - build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
